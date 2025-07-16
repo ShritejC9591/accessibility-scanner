@@ -1,14 +1,15 @@
 {
   "compilerOptions": {
-    "target": "es2020",
+    "target": "ES2020",
     "module": "ESNext",
     "moduleResolution": "Node",
+    "lib": ["DOM", "ES2020"],
+    "types": ["node", "axe-core"],
     "esModuleInterop": true,
-    "forceConsistentCasingInFileNames": true,
-    "strict": true,
+    "resolveJsonModule": true,
     "skipLibCheck": true,
-    "types": ["node", "axe-core"]
+    "forceConsistentCasingInFileNames": true,
+    "strict": true
   },
-  "include": ["**/*.ts"],
-  "exclude": ["node_modules"]
+  "include": ["./**/*.ts"]
 }
