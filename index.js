@@ -1,5 +1,5 @@
 import express from 'express'
-import { runAccessibilityScan } from './accessibilityTest'
+import { runAccessibilityScan } from './accessibilityTest.js'
 const app = express()
 app.use(express.json())
 
