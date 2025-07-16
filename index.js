@@ -21,5 +21,5 @@ app.post('/scan', async (req, res) => {
 })
 
 app.listen(3001, () => {
-  console.log('ACITVE ON PORT 3001')
+  console.log('LISTENING ON PORT 3001')
 })
