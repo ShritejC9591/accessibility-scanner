@@ -1,12 +1,7 @@
-import puppeteer, { Page } from 'puppeteer'
+import puppeteer from 'puppeteer'
 import path from 'path'
 import { readFile } from 'fs/promises'
-import { AxeResults } from 'axe-core'
-import { fileURLToPath } from 'url'
-import { dirname } from 'path'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+import type { AxeResults } from 'axe-core'
 
 interface ScanResult {
   url: string
@@ -27,7 +22,7 @@ export async function runAccessibilityScan({
   concurrency = 5
 }: CrawlConfig): Promise<ScanResult[]> {
   const axeSource = await readFile(
-    path.join(__dirname, 'node_modules', 'axe-core', 'axe.min.js'),
+    path.join(process.cwd(), 'node_modules', 'axe-core', 'axe.min.js'),
     'utf8'
   )
 
@@ -43,9 +38,9 @@ export async function runAccessibilityScan({
       await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 })
       const origin = new URL(url).origin
 
-      const links = await page.evaluate((originStr: string) => {
+      const links = await page.evaluate((originStr: string): string[] => {
         return Array.from(document.querySelectorAll('a'))
-          .map(el => (el as HTMLAnchorElement).href.trim())
+          .map(a => (a as HTMLAnchorElement).href.trim())
           .filter(href =>
             href.startsWith(originStr) &&
             !href.includes('#') &&
@@ -75,9 +70,9 @@ export async function runAccessibilityScan({
       await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 })
       await page.evaluate(axeSource)
 
-      const result = await page.evaluate(async (): Promise<AxeResults> => {
-        // @ts-ignore - axe is injected from axe.min.js
-        return await window.axe.run({
+      const result: AxeResults = await page.evaluate(() => {
+        // @ts-expect-error – this runs in the browser, `window.axe` is injected
+        return window.axe.run({
           runOnly: {
             type: 'tag',
             values: ['wcag2a', 'wcag2aa', 'wcag2aaa']
@@ -87,9 +82,8 @@ export async function runAccessibilityScan({
 
       console.log(`Scanned: ${url}`)
       return { url, result }
-    } catch (error) {
-      const err = error as Error
-      console.error(`Failed to scan: ${url}`, err.message)
+    } catch (err) {
+      console.error(`Failed to scan: ${url}`, (err as Error).message)
       return null
     } finally {
       await page.close()
@@ -98,31 +92,32 @@ export async function runAccessibilityScan({
 
   async function scanWithConcurrency(urls: string[]) {
     const batches: string[][] = []
+
     for (let i = 0; i < urls.length; i += concurrency) {
       batches.push(urls.slice(i, i + concurrency))
     }
 
     for (const batch of batches) {
-      const scanned = await Promise.all(batch.map(scanPage))
-      scanned.forEach(result => {
-        if (result) results.push(result)
+      const resultsInBatch = await Promise.all(batch.map(scanPage))
+      resultsInBatch.forEach(res => {
+        if (res) results.push(res)
       })
     }
   }
 
-  let currentLevel: { url: string; depth: number }[] = [{ url: startUrl, depth: 0 }]
+  let currentLevel = [{ url: startUrl, depth: 0 }]
   visited.add(startUrl)
 
   while (currentLevel.length > 0 && scanCount < maxScans) {
     const urlsToScan = currentLevel.map(n => n.url)
     await scanWithConcurrency(urlsToScan)
 
-    const nextLevel: { url: string; depth: number }[] = []
+    const nextLevel: { url: string, depth: number }[] = []
 
     for (const { url, depth } of currentLevel) {
       if (depth >= maxDepth || scanCount >= maxScans) continue
-      const links = await extractInternalLinks(url)
 
+      const links = await extractInternalLinks(url)
       for (const link of links) {
         if (!visited.has(link)) {
           visited.add(link)
