@@ -13,6 +13,7 @@
   "dependencies": {
     "axe-core": "^4.10.3",
     "express": "^5.1.0",
-    "puppeteer": "^24.14.0"
+    "jsdom": "^26.1.0",
+    "node-fetch": "^3.3.2"
   }
 }
