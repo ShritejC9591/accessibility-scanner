@@ -8,7 +8,8 @@ app.get('/', (req, res) => {
 })
 
 app.post('/scan', async (req, res) => {
-  const { url } = req.body
+  const { url } = req.body || {}
+
   if (!url) return res.status(400).json({ error: 'Missing URL' })
 
   try {
