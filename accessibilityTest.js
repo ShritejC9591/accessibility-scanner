@@ -19,6 +19,7 @@ export async function runAccessibilityScan({
 
     const browser = await puppeteer.launch({
         headless: true,
+        executablePath: puppeteer.executablePath(),
         args: [
             '--no-sandbox',
             '--disable-setuid-sandbox',
@@ -29,7 +30,6 @@ export async function runAccessibilityScan({
         ]
     })
 
-    // Optional: Skip loading images/fonts to reduce timeouts
     async function preparePage(page) {
         await page.setUserAgent(
             'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -117,7 +117,6 @@ export async function runAccessibilityScan({
 
     async function scanWithConcurrency(urls) {
         const batches = []
-
         for (let i = 0; i < urls.length; i += concurrency) {
             batches.push(urls.slice(i, i + concurrency))
         }
