@@ -17,15 +17,48 @@ export async function runAccessibilityScan({
     const results = []
     let scanCount = 0
 
-    const browser = await puppeteer.launch({ headless: true })
+    const browser = await puppeteer.launch({
+        headless: true,
+        args: [
+            '--no-sandbox',
+            '--disable-setuid-sandbox',
+            '--disable-dev-shm-usage',
+            '--disable-gpu',
+            '--no-zygote',
+            '--single-process'
+        ]
+    })
+
+    // Optional: Skip loading images/fonts to reduce timeouts
+    async function preparePage(page) {
+        await page.setUserAgent(
+            'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+        )
+        await page.setJavaScriptEnabled(true)
+
+        await page.setRequestInterception(true)
+        page.on('request', req => {
+            const blocked = ['image', 'stylesheet', 'font', 'media']
+            if (blocked.includes(req.resourceType())) {
+                req.abort()
+            } else {
+                req.continue()
+            }
+        })
+    }
 
     async function extractInternalLinks(url) {
         const page = await browser.newPage()
+        await preparePage(page)
         try {
-            await page.goto(url, { waitUntil: 'networkidle2', timeout: 30000 })
+            await page.goto(url, {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+            })
+
             const origin = new URL(url).origin
 
-            const links = await page.evaluate((originStr) => {
+            const links = await page.evaluate(originStr => {
                 return Array.from(document.querySelectorAll('a'))
                     .map(a => a.href.trim())
                     .filter(href =>
@@ -41,7 +74,8 @@ export async function runAccessibilityScan({
             }, origin)
 
             return [...new Set(links)]
-        } catch {
+        } catch (err) {
+            console.error(`Failed to extract links from ${url}:`, err.message)
             return []
         } finally {
             await page.close()
@@ -53,12 +87,17 @@ export async function runAccessibilityScan({
         scanCount++
 
         const page = await browser.newPage()
+        await preparePage(page)
         try {
-            await page.goto(url, { waitUntil: 'networkidle0', timeout: 30000 })
+            await page.goto(url, {
+                waitUntil: 'domcontentloaded',
+                timeout: 15000
+            })
+
             await page.evaluate(axeSource)
 
-            const result = await page.evaluate(() => {
-                return window.axe.run({
+            const result = await page.evaluate(async () => {
+                return await window.axe.run({
                     runOnly: {
                         type: 'tag',
                         values: ['wcag2a', 'wcag2aa', 'wcag2aaa']
@@ -69,7 +108,7 @@ export async function runAccessibilityScan({
             console.log(`Scanned: ${url}`)
             return { url, result }
         } catch (err) {
-            console.error(`Failed to scan: ${url}`, err.message)
+            console.error(`Failed to scan ${url}:`, err.message)
             return null
         } finally {
             await page.close()
